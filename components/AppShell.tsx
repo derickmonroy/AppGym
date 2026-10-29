@@ -18,7 +18,6 @@ type Tab = "hoy" | "semana" | "historial" | "ajustes";
 const DEFAULT_SETTINGS: Settings = { notifications_enabled: false, reminder_offset_minutes: 15 };
 
 export function AppShell() {
-  const supabase = useMemo(() => getSupabase(), []);
   const router = useRouter();
 
   const [tab, setTab] = useState<Tab>("hoy");
@@ -46,7 +45,7 @@ export function AppShell() {
   );
 
   const load = useCallback(async () => {
-    const { data: userData } = await supabase.auth.getUser();
+    const { data: userData } = await getSupabase().auth.getUser();
     if (!userData.user) {
       router.replace("/login");
       return;
@@ -56,15 +55,15 @@ export function AppShell() {
 
     const since = addDays(todayLocal(), -90);
     const [w, l, s] = await Promise.all([
-      supabase
+      getSupabase()
         .from("workouts")
         .select("id, name, notes, start_date, start_time, repeat_weekly, repeat_days")
         .order("start_time"),
-      supabase
+      getSupabase()
         .from("workout_logs")
         .select("workout_id, occurrence_date, status")
         .gte("occurrence_date", since),
-      supabase
+      getSupabase()
         .from("user_settings")
         .select("notifications_enabled, reminder_offset_minutes")
         .maybeSingle(),
@@ -79,7 +78,7 @@ export function AppShell() {
       setSettings((s.data as Settings | null) ?? DEFAULT_SETTINGS);
     }
     setLoading(false);
-  }, [supabase, router]);
+  }, [router]);
 
   useEffect(() => {
     load();
@@ -107,10 +106,10 @@ export function AppShell() {
     setLogList(status ? [...without, { workout_id: workoutId, occurrence_date: date, status }] : without);
 
     const { error } = status
-      ? await supabase
+      ? await getSupabase()
           .from("workout_logs")
           .upsert({ workout_id: workoutId, occurrence_date: date, status }, { onConflict: "workout_id,occurrence_date" })
-      : await supabase.from("workout_logs").delete().eq("workout_id", workoutId).eq("occurrence_date", date);
+      : await getSupabase().from("workout_logs").delete().eq("workout_id", workoutId).eq("occurrence_date", date);
     if (error) {
       setLogList(prev);
       toast("No se pudo guardar: " + error.message);
@@ -121,8 +120,8 @@ export function AppShell() {
 
   async function saveWorkout(input: WorkoutInput, id?: string): Promise<string | null> {
     const { error } = id
-      ? await supabase.from("workouts").update(input).eq("id", id)
-      : await supabase.from("workouts").insert(input);
+      ? await getSupabase().from("workouts").update(input).eq("id", id)
+      : await getSupabase().from("workouts").insert(input);
     if (error) return error.message;
     await load();
     toast(id ? "Entrenamiento actualizado" : "Entrenamiento creado");
@@ -130,7 +129,7 @@ export function AppShell() {
   }
 
   async function deleteWorkout(id: string): Promise<string | null> {
-    const { error } = await supabase.from("workouts").delete().eq("id", id);
+    const { error } = await getSupabase().from("workouts").delete().eq("id", id);
     if (error) return error.message;
     await load();
     toast("Entrenamiento eliminado");
@@ -141,7 +140,7 @@ export function AppShell() {
     if (!userId) return "Sesión no válida";
     const next = { ...settings, ...patch };
     setSettings(next);
-    const { error } = await supabase
+    const { error } = await getSupabase()
       .from("user_settings")
       .upsert({ user_id: userId, ...next }, { onConflict: "user_id" });
     if (error) {
@@ -152,7 +151,7 @@ export function AppShell() {
   }
 
   async function signOut() {
-    await supabase.auth.signOut();
+    await getSupabase().auth.signOut();
     router.replace("/login");
     router.refresh();
   }
