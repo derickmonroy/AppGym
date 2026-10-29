@@ -17,8 +17,9 @@ import { IconX } from "./Icons";
 
 function defaultTime(): string {
   const p = zonedParts(Date.now());
-  const h = (p.hour + 1) % 24;
-  return `${String(h).padStart(2, "0")}:00`;
+  // La próxima hora en punto; de noche (23 h) se propone 23:30 para no saltar al día anterior.
+  if (p.hour >= 23) return "23:30";
+  return `${String(p.hour + 1).padStart(2, "0")}:00`;
 }
 
 export function WorkoutForm({
